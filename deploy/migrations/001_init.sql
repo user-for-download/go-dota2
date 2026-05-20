@@ -122,6 +122,72 @@ ON CONFLICT (id) DO NOTHING;
 COMMENT ON TABLE heroes IS 'Populated by enricher from /heroes; id=0 is a stub for empty draft slots.';
 
 -- =====================================================
+-- Hero FK stub safety net (consolidated from 002_fix_hero_fk_stubs.sql)
+-- Prevents FK violations when parser ingests matches
+-- referencing heroes not yet loaded by the enricher.
+-- =====================================================
+CREATE OR REPLACE FUNCTION ensure_hero_stubs(p_hero_ids SMALLINT[])
+RETURNS INTEGER
+LANGUAGE plpgsql AS $$
+DECLARE
+    inserted INTEGER;
+BEGIN
+    IF p_hero_ids IS NULL OR array_length(p_hero_ids, 1) IS NULL THEN
+        RETURN 0;
+    END IF;
+
+    WITH ins AS (
+        INSERT INTO heroes (id, name, localized_name)
+        SELECT DISTINCT hid,
+                        'unknown_' || hid::text,
+                        'Unknown Hero ' || hid::text
+        FROM unnest(p_hero_ids) AS t(hid)
+        WHERE hid IS NOT NULL
+        ON CONFLICT (id) DO NOTHING
+        RETURNING 1
+    )
+    SELECT COUNT(*) INTO inserted FROM ins;
+
+    RETURN inserted;
+END;
+$$;
+
+COMMENT ON FUNCTION ensure_hero_stubs(SMALLINT[]) IS
+'Bulk-insert stub hero rows. Enricher must overwrite via ON CONFLICT DO UPDATE on next /heroes run.';
+
+CREATE OR REPLACE FUNCTION trg_ensure_hero_stub()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.hero_id IS NOT NULL THEN
+        INSERT INTO heroes (id, name, localized_name)
+        VALUES (NEW.hero_id,
+                'unknown_' || NEW.hero_id::text,
+                'Unknown Hero ' || NEW.hero_id::text)
+        ON CONFLICT (id) DO NOTHING;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION trg_ensure_hero_stub() IS
+'BEFORE INSERT trigger: auto-creates hero stubs to prevent FK violations on new patch heroes.';
+
+CREATE INDEX IF NOT EXISTS idx_heroes_name_unknown
+    ON heroes (name)
+    WHERE name LIKE 'unknown\_%' ESCAPE '\';
+
+CREATE OR REPLACE VIEW v_unknown_heroes AS
+SELECT id, name, localized_name, updated_at,
+       NOW() - updated_at AS age
+FROM heroes
+WHERE name LIKE 'unknown\_%' ESCAPE '\'
+ORDER BY id;
+
+COMMENT ON VIEW v_unknown_heroes IS
+'Stub heroes awaiting enrichment. Alert if any row.age > ~1h: /heroes enricher is lagging.';
+
+-- =====================================================
 -- ITEMS_IDS
 -- =====================================================
 CREATE TABLE IF NOT EXISTS item_ids (
@@ -1116,5 +1182,26 @@ BEGIN
     LOOP
         EXECUTE format('DROP TRIGGER IF EXISTS trg_%2$s_set_updated_at ON %1$I.%2$I', r.table_schema, r.table_name);
         EXECUTE format('CREATE TRIGGER trg_%2$s_set_updated_at BEFORE UPDATE ON %1$I.%2$I FOR EACH ROW EXECUTE FUNCTION set_updated_at()', r.table_schema, r.table_name);
+    END LOOP;
+END $$;
+
+-- =====================================================
+-- Attach hero-stub safety-net triggers to FK-bound tables
+-- (consolidated from 002_fix_hero_fk_stubs.sql)
+-- =====================================================
+DO $$
+DECLARE
+    t TEXT;
+    tbls TEXT[] := ARRAY['draft_timings', 'picks_bans', 'player_matches'];
+BEGIN
+    FOREACH t IN ARRAY tbls LOOP
+        EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_hero_stub ON %I', t, t);
+        EXECUTE format(
+            'CREATE TRIGGER trg_%1$s_hero_stub
+             BEFORE INSERT ON %1$I
+             FOR EACH ROW
+             EXECUTE FUNCTION trg_ensure_hero_stub()',
+            t
+        );
     END LOOP;
 END $$;

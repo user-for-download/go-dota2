@@ -29,10 +29,13 @@ func (a *Admin) EnsurePartitions(ctx context.Context, until time.Time) error {
 	if until.Before(now) {
 		return nil
 	}
-	days := int(until.Sub(now).Hours() / 24)
-	if days < 1 {
-		days = 1
+	// Calculate how many quarters ahead we need to ensure.
+	// Each quarter is ~3 months, so we round up to cover the full range.
+	months := int(until.Sub(now).Hours() / (24 * 30))
+	quarters := (months / 3) + 1
+	if quarters < 1 {
+		quarters = 1
 	}
-	_, err := a.db.Exec(ctx, "SELECT ensure_future_time_partitions(ARRAY['matches','player_matches','public_matches','player_timeseries'], $1)", days)
+	_, err := a.db.Exec(ctx, "SELECT ensure_future_time_partitions(ARRAY['matches','player_matches','public_matches','player_timeseries'], $1)", quarters)
 	return err
 }
