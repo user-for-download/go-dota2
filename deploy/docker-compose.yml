@@ -2,7 +2,7 @@ name: go-dota2
 
 x-common-env: &common-env
   APP_ENV: ${APP_ENV:-dev}
-  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
   REDIS_ADDRS: ${REDIS_ADDRS:-redis:6379}
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
@@ -17,11 +17,12 @@ x-logging: &logging
       max-file: "3"
 
 services:
+
   redis:
     image: redis:7-alpine
     container_name: dota2-redis
-    <<: [*restart-policy, *logging]
-    profiles: [db, all, migrate]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ db, all, migrate ]
     command: >
       redis-server
       --appendonly yes
@@ -32,17 +33,17 @@ services:
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
-    networks: [dota2-net]
+    networks: [ dota2-net ]
 
   postgres:
     image: postgres:16-alpine
     container_name: dota2-postgres
-    <<: [*restart-policy, *logging]
-    profiles: [db, all, migrate]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ db, all, migrate ]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-dota2}
       POSTGRES_USER: ${POSTGRES_USER:-dota2}
@@ -53,15 +54,15 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dota2}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dota2}" ]
       interval: 5s
       timeout: 3s
       retries: 5
-    networks: [dota2-net]
+    networks: [ dota2-net ]
 
   migrator:
     image: go-dota2-migrator:${TAG:-latest}
-    profiles: [migrate, all]
+    profiles: [ migrate, all ]
     restart: "no"
     env_file: [ .env ]
     environment:
@@ -77,7 +78,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    networks: [dota2-net]
+    networks: [ dota2-net ]
     volumes:
       - ./migrations:/migrations:ro
     logging:
@@ -88,8 +89,8 @@ services:
 
   proxyloader:
     image: go-dota2-proxyloader:${TAG:-latest}
-    <<: [*restart-policy, *logging]
-    profiles: [proxy, workers, enrich, all]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ proxy, workers, enrich, all ]
     env_file: [ .env ]
     environment:
       <<: *common-env
@@ -97,12 +98,12 @@ services:
       - ./proxy.txt:/app/proxy.txt:ro
     depends_on:
       redis: { condition: service_healthy }
-    networks: [dota2-net]
+    networks: [ dota2-net ]
 
   discoverer:
     image: go-dota2-discoverer:${TAG:-latest}
-    <<: [*restart-policy, *logging]
-    profiles: [all, workers, discover]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ all, workers, discover ]
     env_file: [ .env ]
     environment:
       <<: *common-env
@@ -130,12 +131,14 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    networks: [dota2-net]
+      migrator:
+        condition: service_completed_successfully
+    networks: [ dota2-net ]
 
   enricher:
     image: go-dota2-enricher:${TAG:-latest}
-    <<: [*restart-policy, *logging]
-    profiles: [all, workers, enrich]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ all, workers, enrich ]
     env_file: [ .env ]
     environment:
       <<: *common-env
@@ -155,12 +158,12 @@ services:
         condition: service_healthy
       migrator:
         condition: service_completed_successfully
-    networks: [dota2-net]
+    networks: [ dota2-net ]
 
   fetcher:
     image: go-dota2-fetcher:${TAG:-latest}
-    <<: [*restart-policy, *logging]
-    profiles: [workers, all]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ workers, all ]
     env_file: [ .env ]
     environment:
       <<: *common-env
@@ -175,29 +178,33 @@ services:
       - ./proxy.txt:/app/proxy.txt:ro
     depends_on:
       redis: { condition: service_healthy }
-    networks: [dota2-net]
+      migrator:
+        condition: service_completed_successfully
+    networks: [ dota2-net ]
 
   parser:
     image: go-dota2-parser:${TAG:-latest}
-    <<: [*restart-policy, *logging]
-    profiles: [workers, all]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ workers, all ]
     env_file: [ .env ]
     environment:
       <<: *common-env
       QUEUE_CONSUMER: parser-${HOSTNAME:-default}
     depends_on:
       redis: { condition: service_healthy }
-    networks: [dota2-net]
+      migrator:
+        condition: service_completed_successfully
+    networks: [ dota2-net ]
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: dota2-jaeger
-    <<: [*restart-policy, *logging]
-    profiles: [ops, all]
+    <<: [ *restart-policy, *logging ]
+    profiles: [ ops, all ]
     ports:
       - "16686:16686"
       - "4318:4318"
-    networks: [dota2-net]
+    networks: [ dota2-net ]
 
 volumes:
   redis-data:
