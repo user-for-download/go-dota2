@@ -1022,6 +1022,11 @@ CREATE INDEX IF NOT EXISTS idx_player_timeseries_account ON player_timeseries (a
 CREATE INDEX IF NOT EXISTS idx_player_timeseries_hero ON player_timeseries (hero_id, minute);
 CREATE INDEX IF NOT EXISTS idx_player_timeseries_patch ON player_timeseries (patch_id, minute) WHERE patch_id IS NOT NULL;
 
+SELECT apply_storage_params(
+    'player_timeseries',
+    'autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.01'
+);
+
 -- =====================================================
 -- Job queue & migration log
 -- =====================================================
