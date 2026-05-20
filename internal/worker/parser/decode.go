@@ -383,15 +383,22 @@ func objectiveKeyAsString(raw json.RawMessage) *string {
 func expandTimeseries(players []rawPlayer) []matchstore.TimeseriesRow {
 	out := make([]matchstore.TimeseriesRow, 0, len(players)*60)
 	for _, p := range players {
-		maxMin := len(p.GoldT)
-		if len(p.XPT) > maxMin {
-			maxMin = len(p.XPT)
-		}
-		if len(p.LHT) > maxMin {
-			maxMin = len(p.LHT)
-		}
-		if len(p.DNT) > maxMin {
-			maxMin = len(p.DNT)
+		// Use the "times" array as the authoritative time axis when available.
+		// Fall back to the longest per-minute array if times is missing.
+		maxMin := len(p.Times)
+		if maxMin == 0 {
+			if len(p.GoldT) > maxMin {
+				maxMin = len(p.GoldT)
+			}
+			if len(p.XPT) > maxMin {
+				maxMin = len(p.XPT)
+			}
+			if len(p.LHT) > maxMin {
+				maxMin = len(p.LHT)
+			}
+			if len(p.DNT) > maxMin {
+				maxMin = len(p.DNT)
+			}
 		}
 		if maxMin == 0 {
 			continue

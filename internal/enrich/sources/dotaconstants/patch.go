@@ -64,6 +64,7 @@ func parsePatchDate(raw json.RawMessage) time.Time {
 	if len(raw) == 0 {
 		return time.Time{}
 	}
+	// Try string first (RFC3339 or epoch-as-string).
 	var s string
 	if err := json.Unmarshal(raw, &s); err == nil {
 		if epoch, err := strconv.ParseInt(s, 10, 64); err == nil {
@@ -74,6 +75,12 @@ func parsePatchDate(raw json.RawMessage) time.Time {
 		}
 		return time.Time{}
 	}
+	// Try bare number (epoch seconds) — the actual format in dotaconstants.
+	var f float64
+	if err := json.Unmarshal(raw, &f); err == nil {
+		return time.Unix(int64(f), 0).UTC()
+	}
+	// Try array of any (legacy fallback).
 	var arr []any
 	if err := json.Unmarshal(raw, &arr); err == nil && len(arr) > 0 {
 		if f, ok := arr[0].(float64); ok {

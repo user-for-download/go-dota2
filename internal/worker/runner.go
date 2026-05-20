@@ -333,6 +333,9 @@ func staleRecoveryLoop(ctx context.Context, q queue.Queue, rs interface {
 					dropped++
 					continue
 				}
+				// Ack the XAUTOCLAIMed message to prevent it from lingering
+				// in the pending list forever.
+				_ = q.Ack(ctx, t.ID)
 				requeued++
 			}
 			log.Info("recovered stale", "count", len(tasks), "requeued", requeued, "dropped", dropped)

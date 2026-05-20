@@ -45,6 +45,9 @@ func New(rdb *goredis.Client, cfg Config) (*Seen, error) {
 		// This prevents Redis from defaulting to a tiny 1,000-item filter.
 		err := rdb.Do(context.Background(), "BF.RESERVE", s.bloomKey, cfg.BloomErrorRate, cfg.BloomCapacity).Err()
 		if err != nil && !isAlreadyExists(err) {
+			if isUnknownCommand(err) {
+				return nil, fmt.Errorf("bf.reserve: RedisBloom module not loaded: %w", err)
+			}
 			return nil, fmt.Errorf("bf.reserve: %w", err)
 		}
 	}
@@ -57,6 +60,13 @@ func isAlreadyExists(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "BUSYKEY")
+}
+
+func isUnknownCommand(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "unknown command")
 }
 
 var _ dedup.Seen = (*Seen)(nil)

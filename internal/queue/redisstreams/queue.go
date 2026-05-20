@@ -444,11 +444,15 @@ func (q *Queue) matureAsyncRetries(ctx context.Context) {
 		if !ok {
 			continue
 		}
+		// Unwrap the payload: scheduleAsyncRetry stores {"p":"...","retry_count":N}.
+		// Extract the original "p" field so handlers receive the expected payload.
+		payload := extractOriginalPayload(member)
+		retryCount := extractRetryCount(member)
 		pipe.XAdd(ctx, &goredis.XAddArgs{
 			Stream: q.cfg.Stream,
 			Values: map[string]any{
-				fieldPayload: member,
-				fieldRetry:   extractRetryCount(member),
+				fieldPayload: payload,
+				fieldRetry:   retryCount,
 			},
 		})
 		pipe.ZRem(ctx, q.asyncCfg.ZSetKey, z.Member)
@@ -467,4 +471,24 @@ func extractRetryCount(payload string) string {
 		return "0"
 	}
 	return strconv.Itoa(t.RetryCount)
+}
+
+// extractOriginalPayload unwraps the payload stored by scheduleAsyncRetry.
+// scheduleAsyncRetry stores {"p":"<original>","retry_count":N}.
+// This function extracts the original "p" field so handlers receive
+// the expected payload format.
+func extractOriginalPayload(wrapped string) string {
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(wrapped), &raw); err != nil {
+		return wrapped
+	}
+	if p, ok := raw["p"]; ok {
+		switch v := p.(type) {
+		case string:
+			return v
+		case []byte:
+			return string(v)
+		}
+	}
+	return wrapped
 }

@@ -24,11 +24,11 @@ ARG BUILD_DATE=
 ARG GOMAXPROCS=2
 ENV GOMAXPROCS=${GOMAXPROCS}
 
-# Build all six binaries in one invocation with parallel compilation
+# Build all seven binaries in one invocation with parallel compilation
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /out && \
     go build \
       -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" \
       -o /out/ \
-      ./cmd/fetcher ./cmd/parser ./cmd/enricher ./cmd/proxyloader ./cmd/migrator ./cmd/discoverer
+      ./cmd/fetcher ./cmd/parser ./cmd/enricher ./cmd/proxyloader ./cmd/migrator ./cmd/discoverer ./cmd/dlq

@@ -175,7 +175,6 @@ services:
       - ./proxy.txt:/app/proxy.txt:ro
     depends_on:
       redis: { condition: service_healthy }
-      proxyloader: { condition: service_started }
     networks: [dota2-net]
 
   parser:
