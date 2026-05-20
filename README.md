@@ -26,7 +26,8 @@ For the design rationale and component-level details, see
 
 ```
 proxyloader ─▶ proxy pool (Redis)
-│
+                      │
+                      ▼ leased by fetcher
 discoverer ─▶ fetch queue ─▶ fetcher ─▶ parse queue ─▶ parser ─▶ Postgres
                         │              ▲
                         └──── payload blobs ────┘

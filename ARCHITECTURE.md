@@ -79,9 +79,11 @@ returned match IDs onto the **fetch queue**. Supports a one-shot mode
 (`--file <key>`) for ad-hoc backfills and a scheduled mode driven by
 `DISCOVERY_INTERVAL`.
 
-Each discovery cycle (leagues, teams, proplayers, matches) uses the
+Each discovery cycle uses the
 `discovery.HTTPDoer` interface, allowing injected HTTP clients for
-testing without a proxy pool.
+testing without a proxy pool. Currently only the **matches** cycle has
+an implementation (`internal/worker/discovery/matches/`); leagues, teams,
+and proplayers cycles are planned but not yet coded.
 
 Creates a root `cycle.run` span in OpenTelemetry to enable end-to-end
 trace visualization.

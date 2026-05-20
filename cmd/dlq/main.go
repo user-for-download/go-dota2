@@ -18,10 +18,11 @@ import (
 )
 
 // Lua script for atomic XAdd + XDel: adds message to target stream and deletes from DLQ.
-// Returns 1 on success, 0 if XDel fails (message stays in DLQ for safety).
+// ARGV layout: [1]=maxLen, [2]=DLQ message ID, [3..]=field-value pairs for XADD.
+// Returns XDEL count (1 on success, 0 if message already gone).
 var luaReplayAtomic = `
-local added = redis.call('XADD', KEYS[1], 'MAXLEN', '~', ARGV[1], '*', unpack(ARGV, 2))
-local deleted = redis.call('XDEL', KEYS[2], ARGV[0])
+local added = redis.call('XADD', KEYS[1], 'MAXLEN', '~', ARGV[1], '*', unpack(ARGV, 3))
+local deleted = redis.call('XDEL', KEYS[2], ARGV[2])
 return deleted
 `
 
@@ -230,8 +231,9 @@ func cmdReplay(ctx context.Context, rdb *redis.Client, dlqStreams []string, qCfg
 			}
 
 			// Atomic XAdd + XDel via Lua script to prevent duplicates on partial failure.
+			// ARGV layout: [1]=maxLen, [2]=DLQ msg ID, [3..]=field-value pairs.
 			keys := []string{target, dlq}
-			args := []any{m.ID, "~", qCfg.MaxLen}
+			args := []any{qCfg.MaxLen, m.ID}
 			vals := replayValues(m, payload)
 			// Flatten vals into args as alternating key-value pairs.
 			for k, v := range vals {

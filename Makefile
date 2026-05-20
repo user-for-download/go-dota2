@@ -37,7 +37,7 @@ upd: ## Start the full pipeline (detached)
 up-db: ## Start only Redis + Postgres
 	$(COMPOSE) --profile db up -d
 
-down: ## Stop all services and remove volumes
+down: ## Stop all services and remove containers
 	$(COMPOSE) --profile all down
 
 downv: ## Stop all services and remove volumes
