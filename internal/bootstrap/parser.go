@@ -9,13 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/user-for-download/go-dota2/internal/config"
+	"github.com/user-for-download/go-dota2/internal/storage/partitionstore"
+	"github.com/user-for-download/go-dota2/internal/storage/pgclient"
 	"github.com/user-for-download/go-dota2/internal/worker"
 	"github.com/user-for-download/go-dota2/internal/worker/ingester"
 	"github.com/user-for-download/go-dota2/internal/worker/parser"
 )
 
 type ParserDeps struct {
-	Worker *parser.Parser
+	Worker         *parser.Parser
+	PartitionAdmin partitionstore.PartitionAdmin
 }
 
 func BuildParser(
@@ -36,6 +39,8 @@ func BuildParser(
 	}
 
 	repo := MatchWriter(db, log)
+	stores := pgclient.NewStores(db, log)
+	partitionAdmin := stores.Partitions
 
 	dedupSeen, err := DedupSeen(core.Redis.Master(), cfg.Dedup)
 	if err != nil {
@@ -62,5 +67,5 @@ func BuildParser(
 		return nil, fmt.Errorf("parser: init: %w", err)
 	}
 
-	return &ParserDeps{Worker: w}, nil
+	return &ParserDeps{Worker: w, PartitionAdmin: partitionAdmin}, nil
 }

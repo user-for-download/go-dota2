@@ -131,8 +131,9 @@ type FetcherConfig struct {
 }
 
 type ParserConfig struct {
-	Batch int
-	Block time.Duration
+	Batch                        int
+	Block                        time.Duration
+	PartitionMaintenanceInterval time.Duration
 }
 
 type TelemetryConfig struct {
@@ -265,8 +266,9 @@ func Load(path string) (*Config, error) {
 			AllowDirect:     getBool("FETCHER_ALLOW_DIRECT", false),
 		},
 		Parser: ParserConfig{
-			Batch: getInt("PARSER_BATCH", 10),
-			Block: getDur("PARSER_BLOCK", 2*time.Second),
+			Batch:                        getInt("PARSER_BATCH", 10),
+			Block:                        getDur("PARSER_BLOCK", 2*time.Second),
+			PartitionMaintenanceInterval: getDur("PARSER_PARTITION_MAINTENANCE_INTERVAL", 24*time.Hour),
 		},
 		Enrich: EnrichConfig{
 			BootstrapPrefix:      getStr("ENRICH_BOOTSTRAP_PREFIX", "dota2:enrich"),

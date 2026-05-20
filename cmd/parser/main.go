@@ -47,6 +47,35 @@ func main() {
 	parserDeps, err := bootstrap.BuildParser(ctx, cfg, log, core, db)
 	must(log, "build parser", err)
 
+	// Start periodic partition maintenance to ensure future quarterly partitions exist.
+	// Prevents data from falling into default partitions after the initial migration horizon.
+	if parserDeps.PartitionAdmin != nil && cfg.Parser.PartitionMaintenanceInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(cfg.Parser.PartitionMaintenanceInterval)
+			defer ticker.Stop()
+			// Run once immediately to catch up
+			until := time.Now().AddDate(1, 0, 0)
+			if err := parserDeps.PartitionAdmin.EnsurePartitions(ctx, until); err != nil {
+				log.Warn("initial partition maintenance failed", "err", err)
+			} else {
+				log.Info("initial partition maintenance completed", "until", until)
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					until := time.Now().AddDate(1, 0, 0)
+					if err := parserDeps.PartitionAdmin.EnsurePartitions(ctx, until); err != nil {
+						log.Warn("periodic partition maintenance failed", "err", err)
+					} else {
+						log.Info("partition maintenance completed", "until", until)
+					}
+				}
+			}
+		}()
+	}
+
 	log.Info("parser: starting")
 	if err := parserDeps.Worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		log.Error("parser: stopped", "err", err)

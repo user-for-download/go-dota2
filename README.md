@@ -172,6 +172,14 @@ The most commonly overridden ones:
 | `QUEUE_MAX_RETRIES`       | `3`              |
 | `QUEUE_MAX_BACKOFF`       | `30s`            |
 
+### Parser
+
+| Variable                                | Default | Description |
+|-----------------------------------------|---------|-------------|
+| `PARSER_BATCH`                          | `10`    | Number of tasks to pop per iteration |
+| `PARSER_BLOCK`                          | `2s`    | How long to block waiting for tasks |
+| `PARSER_PARTITION_MAINTENANCE_INTERVAL` | `24h`   | How often to ensure future quarterly partitions exist |
+
 ### Enrichment
 
 | Variable                    | Default                                                              |
