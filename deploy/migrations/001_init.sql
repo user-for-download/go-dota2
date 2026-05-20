@@ -159,7 +159,8 @@ CREATE OR REPLACE FUNCTION trg_ensure_hero_stub()
 RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF NEW.hero_id IS NOT NULL THEN
+    IF NEW.hero_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM heroes WHERE id = NEW.hero_id) THEN
         INSERT INTO heroes (id, name, localized_name)
         VALUES (NEW.hero_id,
                 'unknown_' || NEW.hero_id::text,
@@ -174,7 +175,7 @@ COMMENT ON FUNCTION trg_ensure_hero_stub() IS
 'BEFORE INSERT trigger: auto-creates hero stubs to prevent FK violations on new patch heroes.';
 
 CREATE INDEX IF NOT EXISTS idx_heroes_name_unknown
-    ON heroes (name)
+    ON heroes (name text_pattern_ops)
     WHERE name LIKE 'unknown\_%' ESCAPE '\';
 
 CREATE OR REPLACE VIEW v_unknown_heroes AS
@@ -485,8 +486,8 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 -- Insert initial migration version (runner also manages this, but we insert here for safety)
--- INSERT INTO schema_migrations (version, filename) VALUES (1, '001_init.sql')
--- ON CONFLICT (version) DO NOTHING;
+INSERT INTO schema_migrations (version, filename) VALUES (1, '001_init.sql')
+ON CONFLICT (version) DO NOTHING;
 
 -- =====================================================
 -- Matches (RANGE partitioned on start_time, quarterly)
